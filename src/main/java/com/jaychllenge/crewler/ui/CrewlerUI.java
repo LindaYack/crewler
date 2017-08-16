@@ -6,7 +6,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +29,8 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Text;
+import org.jsoup.Jsoup;
+import org.jsoup.helper.StringUtil;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -107,7 +108,7 @@ public class CrewlerUI extends ApplicationWindow {
 		final Button btncss = new Button(group, SWT.CHECK);
 		btncss.setBounds(315, 17, 72, 17);
 		btncss.setText("*.css");
-		
+
 		final Button btngif = new Button(group, SWT.CHECK);
 		btngif.setBounds(159, 17, 72, 17);
 		btngif.setText("*.gif");
@@ -137,13 +138,13 @@ public class CrewlerUI extends ApplicationWindow {
 					sb.deleteCharAt(sb.length() - 1);
 				}
 				sb.append(")[^\\w/:\\.]");
-//				System.out.println(sb.toString());
+				// System.out.println(sb.toString());
 				// 获取网页文字
 				String urlstring = text.getText();
 				URI uriroot = URI.create(urlstring);
 				CloseableHttpClient chc = HttpClients.createDefault();
 				HttpGet hg = new HttpGet(uriroot);
-				FileOutputStream fos=null;
+				FileOutputStream fos = null;
 				try {
 					HttpResponse hr = chc.execute(hg);
 					ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -172,22 +173,23 @@ public class CrewlerUI extends ApplicationWindow {
 						String downloadfile = matcher.group();
 						System.out.println(downloadfile);
 						String downloadsite = downloadfile.split("[^\\w/:\\.]")[1];
-						String filename = downloadsite.substring(downloadsite.lastIndexOf('/')>0?downloadsite.lastIndexOf('/'):0);
+						String filename = downloadsite
+								.substring(downloadsite.lastIndexOf('/') > 0 ? downloadsite.lastIndexOf('/') : 0);
 						File dir = new File(text_1.getText());
 						File file = new File(dir, filename);
 						// 发送网络连接
-						fos=new FileOutputStream(file);
+						fos = new FileOutputStream(file);
 						if (downloadsite.startsWith("http")) {
 							HttpGet hgdownload = new HttpGet(downloadsite);
 							HttpResponse hrdownload = chc.execute(hgdownload);
 							hrdownload.getEntity().writeTo(new FileOutputStream(file));
-						}else if(downloadsite.startsWith("//")){
-							downloadsite="http:"+downloadsite;
+						} else if (downloadsite.startsWith("//")) {
+							downloadsite = "http:" + downloadsite;
 							HttpGet hgdownload = new HttpGet(downloadsite);
 							HttpResponse hrdownload = chc.execute(hgdownload);
 							hrdownload.getEntity().writeTo(new FileOutputStream(file));
-						}else {
-							URI uridownload=uriroot.relativize(new URI(downloadsite));
+						} else {
+							URI uridownload = uriroot.relativize(new URI(downloadsite));
 							HttpGet hgdownload = new HttpGet(uridownload);
 							HttpResponse hrdownload = chc.execute(hgdownload);
 							hrdownload.getEntity().writeTo(new FileOutputStream(file));
@@ -199,8 +201,8 @@ public class CrewlerUI extends ApplicationWindow {
 					e.printStackTrace();
 				} catch (URISyntaxException e) {
 					e.printStackTrace();
-				}finally {
-					if(fos!=null) {
+				} finally {
+					if (fos != null) {
 						try {
 							fos.close();
 						} catch (IOException e) {
@@ -213,7 +215,7 @@ public class CrewlerUI extends ApplicationWindow {
 		button.setBounds(117, 193, 80, 27);
 		button.setText("\u6293\u53D6");
 		container.pack();
-		
+
 		Button btnimg = new Button(container, SWT.NONE);
 		btnimg.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -222,36 +224,38 @@ public class CrewlerUI extends ApplicationWindow {
 				String urlstring = text.getText();
 				URI uriroot = URI.create(urlstring);
 				CloseableHttpClient chc = HttpClients.createDefault();
-				FileOutputStream fos=null;
+				FileOutputStream fos = null;
 				try {
-					Document doc=Document.createShell(urlstring);
-					Elements imgs=doc.body().getElementsByTag("img");
-					Iterator<Element> imgsIterator=imgs.iterator();
-					while(imgsIterator.hasNext()) {
-						System.out.println(imgsIterator.next().attr("src"));
-						URI uridownload=uriroot.relativize(new URI(imgsIterator.next().attr("src")));
-						HttpGet hgdownload = new HttpGet(uridownload);
-						HttpResponse hrdownload = chc.execute(hgdownload);
-						File dir = new File(text_1.getText());
-						String filename=uridownload.getRawPath().substring(uridownload.getRawPath().indexOf('/')>0?uridownload.getRawPath().indexOf('/'):0);
-						File file = new File(dir, filename);
-						hrdownload.getEntity().writeTo(new FileOutputStream(file));
+					Document doc = Jsoup.connect(urlstring).get();
+					Elements imgs = doc.getElementsByTag("img");
+					for (Element e : imgs) {
+						if (!StringUtil.isBlank(e.attr("src"))) {
+							System.out.println(e.attr("src"));
+							String uri="";
+							if(e.attr("src").startsWith("//")) {
+								uri="http:"+e.attr("src");
+							}
+							URI uridownload = uriroot.relativize(URI.create(uri));
+							HttpGet hgdownload = new HttpGet(uridownload);
+							HttpResponse hrdownload = chc.execute(hgdownload);
+							File dir = new File(text_1.getText());
+							String filename = uridownload.getRawPath()
+									.substring(uridownload.getRawPath().lastIndexOf('/') > 0
+											? uridownload.getRawPath().lastIndexOf('/')
+											: 0);
+							File file = new File(dir, filename);
+							hrdownload.getEntity().writeTo(new FileOutputStream(file));
+						}
 					}
 				} catch (ClientProtocolException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
-				} catch (URISyntaxException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}finally {
-					if(fos!=null) {
+				} finally {
+					if (fos != null) {
 						try {
 							fos.close();
 						} catch (IOException e) {
-							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 					}
