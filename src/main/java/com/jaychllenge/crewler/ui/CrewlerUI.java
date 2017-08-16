@@ -1,24 +1,20 @@
 package com.jaychllenge.crewler.ui;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.StatusLineManager;
 import org.eclipse.jface.action.ToolBarManager;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.window.ApplicationWindow;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Point;
@@ -38,17 +34,27 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.custom.StyledText;
+import org.eclipse.jface.text.TextViewer;
+import org.eclipse.swt.custom.ScrolledComposite;
 
 public class CrewlerUI extends ApplicationWindow {
 	private Text text;
 	private Text text_1;
+	private Button btnjpg;
+	private Button btnpng;
+	private Button btnjs;
+	private Button btncss;
+	private Button btngif;
+	private Button button;
+	private Button btnimg;
+	private TextViewer textViewer;
 
 	/**
 	 * Create the application window.
 	 */
 	public CrewlerUI() {
 		super(null);
-		createActions();
 	}
 
 	/**
@@ -92,165 +98,127 @@ public class CrewlerUI extends ApplicationWindow {
 		Group group = new Group(container, SWT.NONE);
 		group.setBounds(7, 115, 417, 63);
 
-		final Button btnjpg = new Button(group, SWT.CHECK);
+		btnjpg = new Button(group, SWT.CHECK);
 		btnjpg.setSelection(true);
 		btnjpg.setBounds(3, 17, 72, 17);
 		btnjpg.setText("*.jpg");
 
-		final Button btnpng = new Button(group, SWT.CHECK);
+		btnpng = new Button(group, SWT.CHECK);
 		btnpng.setBounds(81, 17, 72, 17);
 		btnpng.setText("*.png");
 
-		final Button btnjs = new Button(group, SWT.CHECK);
+		btnjs = new Button(group, SWT.CHECK);
 		btnjs.setBounds(237, 17, 72, 17);
 		btnjs.setText("*.js");
 
-		final Button btncss = new Button(group, SWT.CHECK);
+		btncss = new Button(group, SWT.CHECK);
 		btncss.setBounds(315, 17, 72, 17);
 		btncss.setText("*.css");
 
-		final Button btngif = new Button(group, SWT.CHECK);
+		btngif = new Button(group, SWT.CHECK);
 		btngif.setBounds(159, 17, 72, 17);
 		btngif.setText("*.gif");
 
-		Button button = new Button(container, SWT.NONE);
+		button = new Button(container, SWT.NONE);
 		button.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent arg0) {
-				// 设置下载的文件格式
-				StringBuffer sb = new StringBuffer("[^\\w/:\\.](");
-				if (btnjpg.getSelection()) {
-					sb.append("([\\w/:\\.]+\\.jpg)|");
-				}
-				if (btnpng.getSelection()) {
-					sb.append("([\\w/:\\.]+\\.png)|");
-				}
-				if (btnjs.getSelection()) {
-					sb.append("([\\w/:\\.]+\\.js)|");
-				}
-				if (btncss.getSelection()) {
-					sb.append("([\\w/:\\.]+\\.css)|");
-				}
-				if (btngif.getSelection()) {
-					sb.append("([\\w/:\\.]+\\.gif)|");
-				}
-				if (sb.charAt(sb.length() - 1) == '|') {
-					sb.deleteCharAt(sb.length() - 1);
-				}
-				sb.append(")[^\\w/:\\.]");
-				// System.out.println(sb.toString());
-				// 获取网页文字
-				String urlstring = text.getText();
-				URI uriroot = URI.create(urlstring);
-				CloseableHttpClient chc = HttpClients.createDefault();
-				HttpGet hg = new HttpGet(uriroot);
-				FileOutputStream fos = null;
-				try {
-					HttpResponse hr = chc.execute(hg);
-					ByteArrayOutputStream bos = new ByteArrayOutputStream();
-					HttpEntity he = hr.getEntity();
-					he.writeTo(bos);
-					Header charset = he.getContentEncoding();
-					String htmlcontent = "";
-					if (charset == null) {
-						String html = bos.toString();
-						String charset1 = html.substring(html.indexOf("charset=") + 8,
-								html.indexOf(">", html.indexOf("charset=") + 8));
-						if (charset1.indexOf("'") > 0) {
-							charset1 = charset1.substring(0, charset1.indexOf("'"));
-						}
-						if (charset1.indexOf('"') > 0) {
-							charset1 = charset1.substring(0, charset1.indexOf('"'));
-						}
-						htmlcontent = bos.toString(charset1);
-					} else {
-						htmlcontent = bos.toString(charset.getValue());
+				button.setEnabled(false);
+				Display.getDefault().asyncExec(new Runnable() {
+					public void run() {
+						zhuaTu();
 					}
-					// 获取需要下载的文件的地址
-					Matcher matcher = Pattern.compile(sb.toString()).matcher(htmlcontent);
-					while (matcher.find()) {
-						// 下载文件
-						String downloadfile = matcher.group();
-						System.out.println(downloadfile);
-						String downloadsite = downloadfile.split("[^\\w/:\\.]")[1];
-						String filename = downloadsite
-								.substring(downloadsite.lastIndexOf('/') > 0 ? downloadsite.lastIndexOf('/') : 0);
-						File dir = new File(text_1.getText());
-						File file = new File(dir, filename);
-						// 发送网络连接
-						fos = new FileOutputStream(file);
-						if (downloadsite.startsWith("http")) {
-							HttpGet hgdownload = new HttpGet(downloadsite);
-							HttpResponse hrdownload = chc.execute(hgdownload);
-							hrdownload.getEntity().writeTo(new FileOutputStream(file));
-						} else if (downloadsite.startsWith("//")) {
-							downloadsite = "http:" + downloadsite;
-							HttpGet hgdownload = new HttpGet(downloadsite);
-							HttpResponse hrdownload = chc.execute(hgdownload);
-							hrdownload.getEntity().writeTo(new FileOutputStream(file));
-						} else {
-							URI uridownload = uriroot.relativize(new URI(downloadsite));
-							HttpGet hgdownload = new HttpGet(uridownload);
-							HttpResponse hrdownload = chc.execute(hgdownload);
-							hrdownload.getEntity().writeTo(new FileOutputStream(file));
-						}
-					}
-				} catch (ClientProtocolException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				} catch (URISyntaxException e) {
-					e.printStackTrace();
-				} finally {
-					if (fos != null) {
-						try {
-							fos.close();
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					}
-				}
+				});
 			}
 		});
 		button.setBounds(117, 193, 80, 27);
 		button.setText("\u6293\u53D6");
 		container.pack();
 
-		Button btnimg = new Button(container, SWT.NONE);
+		btnimg = new Button(container, SWT.NONE);
 		btnimg.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent arg0) {
-				// 获取网页文字
-				String urlstring = text.getText();
-				URI uriroot = URI.create(urlstring);
-				CloseableHttpClient chc = HttpClients.createDefault();
-				FileOutputStream fos = null;
-				try {
-					Document doc = Jsoup.connect(urlstring).get();
-					Elements imgs = doc.getElementsByTag("img");
-					for (Element e : imgs) {
-						if (!StringUtil.isBlank(e.attr("src"))) {
-							System.out.println(e.attr("src"));
-							String uri="";
-							if(e.attr("src").startsWith("//")) {
-								uri="http:"+e.attr("src");
-							}
-							URI uridownload = uriroot.relativize(URI.create(uri));
-							HttpGet hgdownload = new HttpGet(uridownload);
-							HttpResponse hrdownload = chc.execute(hgdownload);
-							File dir = new File(text_1.getText());
-							String filename = uridownload.getRawPath()
-									.substring(uridownload.getRawPath().lastIndexOf('/') > 0
-											? uridownload.getRawPath().lastIndexOf('/')
-											: 0);
-							File file = new File(dir, filename);
-							hrdownload.getEntity().writeTo(new FileOutputStream(file));
-						}
+				btnimg.setEnabled(false);
+				Display.getDefault().asyncExec(new Runnable() {
+					public void run() {
+						zhuaImgTu();
 					}
-				} catch (ClientProtocolException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
+				});
+			}
+		});
+		btnimg.setBounds(218, 193, 80, 27);
+		btnimg.setText("\u6293\u53D6img\u6807\u7B7E");
+
+		ScrolledComposite scrolledComposite = new ScrolledComposite(container,
+				SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL);
+		scrolledComposite.setBounds(10, 226, 408, 151);
+		scrolledComposite.setExpandHorizontal(true);
+		scrolledComposite.setExpandVertical(true);
+
+		textViewer = new TextViewer(scrolledComposite, SWT.MULTI | SWT.V_SCROLL);
+		StyledText styledText = textViewer.getTextWidget();
+		scrolledComposite.setContent(styledText);
+		scrolledComposite.setMinSize(styledText.computeSize(SWT.DEFAULT, SWT.DEFAULT));
+		return container;
+	}
+
+	private void zhuaTu() {
+		// 设置下载的文件格式
+		StringBuffer sb = new StringBuffer("[^\\w/:\\.](");
+		if (btnjpg.getSelection()) {
+			sb.append("([\\w/:\\._]+\\.jpg)|");
+		}
+		if (btnpng.getSelection()) {
+			sb.append("([\\w/:\\._]+\\.png)|");
+		}
+		if (btnjs.getSelection()) {
+			sb.append("([\\w/:\\._]+\\.js)|");
+		}
+		if (btncss.getSelection()) {
+			sb.append("([\\w/:\\._]+\\.css)|");
+		}
+		if (btngif.getSelection()) {
+			sb.append("([\\w/:\\._]+\\.gif)|");
+		}
+		if (sb.charAt(sb.length() - 1) == '|') {
+			sb.deleteCharAt(sb.length() - 1);
+		}
+		sb.append(")[^\\w/:\\.]");
+		// 获取网页文字
+		String urlstring = text.getText();
+		URI uriroot = URI.create(urlstring);
+		CloseableHttpClient chc = HttpClients.createDefault();
+		try {
+			String htmlcontent = Jsoup.connect(urlstring).get().html();
+			// 获取需要下载的文件的地址
+			Matcher matcher = Pattern.compile(sb.toString()).matcher(htmlcontent);
+			// 下载进程记录
+			StringBuffer error = new StringBuffer();
+			StringBuffer downloadProgress = new StringBuffer();
+			boolean errorflag = false;
+			while (matcher.find()) {
+				// 下载文件
+				String downloadfile = matcher.group();
+				String downloadsite = downloadfile.split("[^\\w/:\\.]")[1];
+				String filename = downloadsite
+						.substring(downloadsite.lastIndexOf('/') > 0 ? downloadsite.lastIndexOf('/') : 0);
+				File dir = new File(text_1.getText());
+				File file = new File(dir, filename);
+				FileOutputStream fos = new FileOutputStream(file);
+				try {
+					// 发送网络连接
+					URI uridownload = uriroot.resolve(downloadsite);
+					downloadProgress.append("downloading '").append(uridownload).append("' ...\n");
+					HttpGet hgdownload = new HttpGet(uridownload);
+					HttpResponse hrdownload = chc.execute(hgdownload);
+					hrdownload.getEntity().writeTo(fos);
+					fos.flush();
+					downloadProgress.append("'").append(downloadsite).append("' has downloaded\n");
+				} catch (Exception e) {
+					error.append("download '").append(downloadsite).append("' error:").append(e.getMessage())
+							.append('\n');
+					errorflag = true;
 				} finally {
 					if (fos != null) {
 						try {
@@ -260,18 +228,93 @@ public class CrewlerUI extends ApplicationWindow {
 						}
 					}
 				}
+				textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
+				textViewer.refresh();
 			}
-		});
-		btnimg.setBounds(218, 193, 80, 27);
-		btnimg.setText("\u6293\u53D6img\u6807\u7B7E");
-		return container;
+			
+			if (errorflag) {
+				MessageDialog md = new MessageDialog(getShell(), "错误", null, error.toString(), MessageDialog.ERROR,
+						new String[] { "OK" }, 0);
+				md.open();
+			} else {
+				MessageDialog md = new MessageDialog(getShell(), "成功", null, "抓取成功！", MessageDialog.INFORMATION,
+						new String[] { "OK" }, 0);
+				md.open();
+			}
+		} catch (Exception e) {
+			MessageDialog md = new MessageDialog(getShell(), "错误", null, e.getMessage(), MessageDialog.ERROR,
+					new String[] { "OK" }, 0);
+			md.open();
+		} finally {
+			button.setEnabled(true);
+		}
 	}
 
-	/**
-	 * Create the actions.
-	 */
-	private void createActions() {
-		// Create the actions
+	private void zhuaImgTu() {
+		// 获取网页文字
+		String urlstring = text.getText();
+		URI uriroot = URI.create(urlstring);
+		CloseableHttpClient chc = HttpClients.createDefault();
+		try {
+			Document doc = Jsoup.connect(urlstring).get();
+			Elements imgs = doc.getElementsByTag("img");
+			// 下载进程记录
+			StringBuffer error = new StringBuffer();
+			StringBuffer downloadProgress = new StringBuffer();
+			boolean errorflag = false;
+
+			for (Element e : imgs) {
+				if (!StringUtil.isBlank(e.attr("src"))) {
+					System.out.println(e.attr("src"));
+					String uri = e.attr("src");
+					URI uridownload = uriroot.resolve(uri);
+					downloadProgress.append("downloading '").append(uridownload).append("' ...\n");
+					HttpGet hgdownload = new HttpGet(uridownload);
+					HttpResponse hrdownload = chc.execute(hgdownload);
+					File dir = new File(text_1.getText());
+					String filename = uridownload.getRawPath()
+							.substring(uridownload.getRawPath().lastIndexOf('/') > 0
+									? uridownload.getRawPath().lastIndexOf('/')
+									: 0);
+					File file = new File(dir, filename);
+					FileOutputStream fos = new FileOutputStream(file);
+					try {
+						hrdownload.getEntity().writeTo(fos);
+						fos.flush();
+						downloadProgress.append("'").append(uri).append("' has downloaded.\n");
+					} catch (Exception ex) {
+						error.append("download '").append(uri).append("' error:").append(ex.getMessage()).append('\n');
+						errorflag = true;
+					} finally {
+						if (fos != null) {
+							try {
+								fos.close();
+							} catch (IOException ex) {
+								ex.printStackTrace();
+							}
+						}
+					}
+					textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
+					textViewer.refresh();
+				}
+			}
+			
+			if (errorflag) {
+				MessageDialog md = new MessageDialog(getShell(), "错误", null, error.toString(),
+						MessageDialog.ERROR, new String[] { "OK" }, 0);
+				md.open();
+			} else {
+				MessageDialog md = new MessageDialog(getShell(), "成功", null, "抓取成功！", MessageDialog.INFORMATION,
+						new String[] { "OK" }, 0);
+				md.open();
+			}
+		} catch (Exception e) {
+			MessageDialog md = new MessageDialog(getShell(), "错误", null, e.getMessage(), MessageDialog.ERROR,
+					new String[] { "OK" }, 0);
+			md.open();
+		} finally {
+			btnimg.setEnabled(true);
+		}
 	}
 
 	/**
@@ -339,6 +382,6 @@ public class CrewlerUI extends ApplicationWindow {
 	 */
 	@Override
 	protected Point getInitialSize() {
-		return new Point(444, 272);
+		return new Point(444, 429);
 	}
 }
