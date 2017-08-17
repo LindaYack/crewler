@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,6 +13,10 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.StatusLineManager;
 import org.eclipse.jface.action.ToolBarManager;
@@ -124,11 +130,19 @@ public class CrewlerUI extends ApplicationWindow {
 			@Override
 			public void widgetSelected(SelectionEvent arg0) {
 				button.setEnabled(false);
-				Display.getDefault().asyncExec(new Runnable() {
-					public void run() {
-						zhuaTu();
+				Job buttonJob = new Job("buttonJob") {
+					@Override
+					protected IStatus run(IProgressMonitor arg0) {
+						Display.getDefault().asyncExec(new Runnable() {
+							public void run() {
+								zhuaTu();
+							}
+						});
+						return Status.OK_STATUS;
 					}
-				});
+				};
+				buttonJob.setUser(true);
+				buttonJob.schedule();
 			}
 		});
 		button.setBounds(117, 193, 80, 27);
@@ -140,11 +154,21 @@ public class CrewlerUI extends ApplicationWindow {
 			@Override
 			public void widgetSelected(SelectionEvent arg0) {
 				btnimg.setEnabled(false);
-				Display.getDefault().asyncExec(new Runnable() {
-					public void run() {
-						zhuaImgTu();
+				Job btnimgJob = new Job("imgJob") {
+
+					@Override
+					protected IStatus run(IProgressMonitor arg0) {
+						Display.getDefault().asyncExec(new Runnable() {
+							public void run() {
+								zhuaImgTu();
+							}
+						});
+						return Status.OK_STATUS;
 					}
-				});
+
+				};
+				btnimgJob.setUser(true);
+				btnimgJob.schedule();
 			}
 		});
 		btnimg.setBounds(218, 193, 80, 27);
@@ -162,6 +186,8 @@ public class CrewlerUI extends ApplicationWindow {
 		scrolledComposite.setMinSize(styledText.computeSize(SWT.DEFAULT, SWT.DEFAULT));
 		return container;
 	}
+
+	private String urlstring;
 
 	private void zhuaTu() {
 		// 设置下载的文件格式
@@ -186,52 +212,71 @@ public class CrewlerUI extends ApplicationWindow {
 		}
 		sb.append(")[^\\w/:\\.]");
 		// 获取网页文字
-		String urlstring = text.getText();
+		urlstring = text.getText();
 		URI uriroot = URI.create(urlstring);
-		CloseableHttpClient chc = HttpClients.createDefault();
+		// 下载进程记录
+		StringBuilder downloadProgress = new StringBuilder();
+		StringBuilder error = new StringBuilder();
+		boolean errorflag = false;
 		try {
 			String htmlcontent = Jsoup.connect(urlstring).get().html();
 			// 获取需要下载的文件的地址
 			Matcher matcher = Pattern.compile(sb.toString()).matcher(htmlcontent);
-			// 下载进程记录
-			StringBuffer error = new StringBuffer();
-			StringBuffer downloadProgress = new StringBuffer();
-			boolean errorflag = false;
+
+			// 防重复下载
+			List<String> hasdown = new LinkedList<String>();
 			while (matcher.find()) {
 				// 下载文件
 				String downloadfile = matcher.group();
-				String downloadsite = downloadfile.split("[^\\w/:\\.]")[1];
-				String filename = downloadsite
-						.substring(downloadsite.lastIndexOf('/') > 0 ? downloadsite.lastIndexOf('/') : 0);
-				File dir = new File(text_1.getText());
-				File file = new File(dir, filename);
-				FileOutputStream fos = new FileOutputStream(file);
-				try {
-					// 发送网络连接
-					URI uridownload = uriroot.resolve(downloadsite);
-					downloadProgress.append("downloading '").append(uridownload).append("' ...\n");
-					HttpGet hgdownload = new HttpGet(uridownload);
-					HttpResponse hrdownload = chc.execute(hgdownload);
-					hrdownload.getEntity().writeTo(fos);
-					fos.flush();
-					downloadProgress.append("'").append(downloadsite).append("' has downloaded\n");
-				} catch (Exception e) {
-					error.append("download '").append(downloadsite).append("' error:").append(e.getMessage())
-							.append('\n');
-					errorflag = true;
-				} finally {
-					if (fos != null) {
-						try {
-							fos.close();
-						} catch (IOException e) {
-							e.printStackTrace();
+				final String downloadsite = downloadfile.split("[^\\w/:\\.]")[1];
+				// 发送网络连接
+				final URI uridownload = uriroot.resolve(downloadsite);
+				if (hasdown.contains(uridownload.toString())) {
+					downloadProgress.append("'").append(uridownload).append("' has downloaded.\n");
+				} else {
+					hasdown.add(uridownload.toString());
+					CloseableHttpClient chc = HttpClients.createDefault();
+					// 开始下载
+					String filename = downloadsite
+							.substring(downloadsite.lastIndexOf('/') > 0 ? downloadsite.lastIndexOf('/') : 0);
+					File dir = new File(text_1.getText());
+					File file = new File(dir, filename);
+					FileOutputStream fos = null;
+
+					try {
+						downloadProgress.append("downloading '").append(uridownload).append("' ...\n");
+						HttpGet hgdownload = new HttpGet(uridownload);
+						// 模拟referer破解防盗链
+						hgdownload.addHeader("origin", urlstring);
+						hgdownload.addHeader("referer", urlstring);
+						HttpResponse hrdownload = chc.execute(hgdownload);
+						System.out.println(hrdownload.getStatusLine().getStatusCode() + "-----" + filename);
+						if (hrdownload.getEntity().getContentLength() > 0) {
+							fos = new FileOutputStream(file);
+							hrdownload.getEntity().writeTo(fos);
+							fos.flush();
+							downloadProgress.append("'").append(uridownload).append("' has downloaded.\n");
+						} else {
+							downloadProgress.append("'").append(uridownload).append("' can't download!\n");
+						}
+					} catch (Exception e) {
+						error.append("download '").append(uridownload).append("' error:").append(e.getMessage())
+								.append('\n');
+						errorflag = true;
+					} finally {
+						if (fos != null) {
+							try {
+								fos.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
 						}
 					}
 				}
 				textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
 				textViewer.refresh();
 			}
-			
+
 			if (errorflag) {
 				MessageDialog md = new MessageDialog(getShell(), "错误", null, error.toString(), MessageDialog.ERROR,
 						new String[] { "OK" }, 0);
@@ -263,34 +308,54 @@ public class CrewlerUI extends ApplicationWindow {
 			StringBuffer downloadProgress = new StringBuffer();
 			boolean errorflag = false;
 
+			// 防止重复下载
+			List<String> hasdown = new LinkedList<String>();
 			for (Element e : imgs) {
 				if (!StringUtil.isBlank(e.attr("src"))) {
 					System.out.println(e.attr("src"));
 					String uri = e.attr("src");
 					URI uridownload = uriroot.resolve(uri);
-					downloadProgress.append("downloading '").append(uridownload).append("' ...\n");
-					HttpGet hgdownload = new HttpGet(uridownload);
-					HttpResponse hrdownload = chc.execute(hgdownload);
-					File dir = new File(text_1.getText());
-					String filename = uridownload.getRawPath()
-							.substring(uridownload.getRawPath().lastIndexOf('/') > 0
-									? uridownload.getRawPath().lastIndexOf('/')
-									: 0);
-					File file = new File(dir, filename);
-					FileOutputStream fos = new FileOutputStream(file);
-					try {
-						hrdownload.getEntity().writeTo(fos);
-						fos.flush();
-						downloadProgress.append("'").append(uri).append("' has downloaded.\n");
-					} catch (Exception ex) {
-						error.append("download '").append(uri).append("' error:").append(ex.getMessage()).append('\n');
-						errorflag = true;
-					} finally {
-						if (fos != null) {
-							try {
-								fos.close();
-							} catch (IOException ex) {
-								ex.printStackTrace();
+					System.out.println(uridownload);
+					if (hasdown.contains(uridownload.toString())) {
+						downloadProgress.append("'").append(uridownload).append("' has downloaded\n");
+					} else {
+						hasdown.add(uridownload.toString());
+						downloadProgress.append("downloading '").append(uridownload).append("' ...\n");
+						HttpGet hgdownload = new HttpGet(uridownload);
+						// 模拟referer破解防盗链
+						hgdownload.addHeader("origin", urlstring);
+						hgdownload.addHeader("referer", urlstring);
+
+						File dir = new File(text_1.getText());
+						String filename = uridownload.toString()
+								.substring(uridownload.toString().lastIndexOf('/') > 0
+										? uridownload.toString().lastIndexOf('/')
+										: 0);
+						File file = new File(dir, filename);
+						FileOutputStream fos = null;
+						try {
+							HttpResponse hrdownload = chc.execute(hgdownload);
+							System.out.println(hrdownload.getStatusLine().getStatusCode() + "-----" + filename);
+							if (hrdownload.getStatusLine().getStatusCode() == 200
+									&& hrdownload.getEntity().getContentLength() > 0) {
+								fos = new FileOutputStream(file);
+								hrdownload.getEntity().writeTo(fos);
+								fos.flush();
+								downloadProgress.append("'").append(uridownload).append("' has downloaded.\n");
+							} else {
+								downloadProgress.append("'").append(uridownload).append("' can't download!\n");
+							}
+						} catch (Exception ex) {
+							error.append("download '").append(uridownload).append("' error:").append(ex.getMessage())
+									.append('\n');
+							errorflag = true;
+						} finally {
+							if (fos != null) {
+								try {
+									fos.close();
+								} catch (IOException ex) {
+									ex.printStackTrace();
+								}
 							}
 						}
 					}
@@ -298,10 +363,10 @@ public class CrewlerUI extends ApplicationWindow {
 					textViewer.refresh();
 				}
 			}
-			
+
 			if (errorflag) {
-				MessageDialog md = new MessageDialog(getShell(), "错误", null, error.toString(),
-						MessageDialog.ERROR, new String[] { "OK" }, 0);
+				MessageDialog md = new MessageDialog(getShell(), "错误", null, error.toString(), MessageDialog.ERROR,
+						new String[] { "OK" }, 0);
 				md.open();
 			} else {
 				MessageDialog md = new MessageDialog(getShell(), "成功", null, "抓取成功！", MessageDialog.INFORMATION,

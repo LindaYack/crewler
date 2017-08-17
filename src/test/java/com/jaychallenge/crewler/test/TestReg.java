@@ -20,11 +20,26 @@ import org.jsoup.nodes.Element;
 public class TestReg {
 
 	public static void main(String[] args) {
-			URI uriroot=URI.create("http://p1.17ll.com/apply/pc/?go=meiwen-design-new--554-1-2-1.html?appopen2=yes%26appopen3=yes%26from=singlemessage%26isappinstalled=1");
-			URI uriget=uriroot.resolve("../ico/s1.png");
-			System.out.println(uriget);
+		URI uriroot=URI.create("https://image.baidu.com/search/0.jpg");
+		URI referer=URI.create("https://image.baidu.com/search/index?tn=baiduimage&ipn=r&ct=201326592&cl=2&lm=-1&st=-1&fm=result&fr=&sf=1&fmq=1502936051165_R&pv=&ic=0&nc=1&z=&se=1&showtab=0&fb=0&width=&height=&face=0&istype=2&ie=utf-8&word=%E9%83%91%E7%88%BD");
+		CloseableHttpClient chc=HttpClients.createDefault();
+		HttpGet hg=new HttpGet(uriroot);
+		hg.addHeader("origin", referer.toString());
+		hg.addHeader("referer", referer.toString());
+		try {
+			long start=System.currentTimeMillis();
+			HttpResponse hr=chc.execute(hg);
+			System.out.println(hr.getStatusLine());
+			System.out.println("start getContentlength"+(System.currentTimeMillis()-start)+"--------");
+			System.out.println(hr.getEntity().getContentLength());
+			System.out.println("end getContentlength"+(System.currentTimeMillis()-start)+"--------");
+		} catch (ClientProtocolException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
 	}
-
 	public static void testJsoup() {
 		Document doc;
 		try {
