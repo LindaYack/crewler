@@ -251,7 +251,7 @@ public class CrewlerUI extends ApplicationWindow {
 						hgdownload.addHeader("referer", urlstring);
 						HttpResponse hrdownload = chc.execute(hgdownload);
 						System.out.println(hrdownload.getStatusLine().getStatusCode() + "-----" + filename);
-						if (hrdownload.getEntity().getContentLength() > 0) {
+						if (hrdownload.getStatusLine().getStatusCode()==200&&hrdownload.getEntity().getContentLength() > 0) {
 							fos = new FileOutputStream(file);
 							hrdownload.getEntity().writeTo(fos);
 							fos.flush();
@@ -273,10 +273,9 @@ public class CrewlerUI extends ApplicationWindow {
 						}
 					}
 				}
-				textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
-				textViewer.refresh();
 			}
-
+			textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
+			textViewer.refresh();
 			if (errorflag) {
 				MessageDialog md = new MessageDialog(getShell(), "´íÎó", null, error.toString(), MessageDialog.ERROR,
 						new String[] { "OK" }, 0);
@@ -359,11 +358,10 @@ public class CrewlerUI extends ApplicationWindow {
 							}
 						}
 					}
-					textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
-					textViewer.refresh();
 				}
 			}
-
+			textViewer.setDocument(new org.eclipse.jface.text.Document(downloadProgress.toString()));
+			textViewer.refresh();
 			if (errorflag) {
 				MessageDialog md = new MessageDialog(getShell(), "´íÎó", null, error.toString(), MessageDialog.ERROR,
 						new String[] { "OK" }, 0);
